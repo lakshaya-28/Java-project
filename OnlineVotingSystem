@@ -1,0 +1,454 @@
+import java.awt.*;
+import java.awt.event.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+
+public class OnlineVotingSystem {
+    // Data structures
+    private final HashMap<String, Voter> voters = new HashMap<>();
+    private final List<Candidate> candidates = new ArrayList<>();
+    private final List<String> auditLog = new ArrayList<>();
+
+    // Admin passwords
+    private static final String ADMIN_RESULT_PASSWORD = "result123";
+    private static final String ADMIN_AUDIT_PASSWORD = "audit123";
+
+    public OnlineVotingSystem() {
+        createMainFrame();
+    }
+
+    private void createMainFrame() {
+        Frame mainFrame = new Frame("Online Voting System");
+        mainFrame.setLayout(new FlowLayout());
+        mainFrame.setSize(400, 300);
+
+        // Buttons for various functionalities
+        Button voterRegistrationButton = new Button("Voter Registration");
+        Button candidateManagementButton = new Button("Candidate Management");
+        Button votingButton = new Button("Voting");
+        Button resultsButton = new Button("View Results");
+        Button auditLogButton = new Button("View Audit Log");
+
+        // Add buttons to the frame
+        mainFrame.add(voterRegistrationButton);
+        mainFrame.add(candidateManagementButton);
+        mainFrame.add(votingButton);
+        mainFrame.add(resultsButton);
+        mainFrame.add(auditLogButton);
+
+        // Action listeners for buttons
+        voterRegistrationButton.addActionListener(e -> createVoterRegistrationFrame());
+        candidateManagementButton.addActionListener(e -> createCandidateManagementFrame());
+        votingButton.addActionListener(e -> createVotingFrame());
+        resultsButton.addActionListener(e -> validateResultsPassword());
+        auditLogButton.addActionListener(e -> validateAuditLogPassword());
+
+        mainFrame.addWindowListener(new WindowAdapter() {
+            public void windowClosing(WindowEvent e) {
+                System.exit(0);
+            }
+        });
+
+        mainFrame.setVisible(true);
+    }
+
+    private void createVoterRegistrationFrame() {
+        Frame voterFrame = new Frame("Voter Registration");
+        voterFrame.setLayout(new GridLayout(5, 2));
+        voterFrame.setSize(400, 250);
+
+        TextField voterIdField = new TextField();
+        TextField voterNameField = new TextField();
+        TextField voterAgeField = new TextField();
+        Choice electionTypeChoice = new Choice();
+        Button registerButton = new Button("Register");
+
+        electionTypeChoice.add("Government");
+        electionTypeChoice.add("Education");
+        electionTypeChoice.add("Organization");
+
+        voterFrame.add(new Label("Voter ID:"));
+        voterFrame.add(voterIdField);
+        voterFrame.add(new Label("Name:"));
+        voterFrame.add(voterNameField);
+        voterFrame.add(new Label("Age:"));
+        voterFrame.add(voterAgeField);
+        voterFrame.add(new Label("Election Type:"));
+        voterFrame.add(electionTypeChoice);
+        voterFrame.add(registerButton);
+
+        registerButton.addActionListener(e -> {
+            String id = voterIdField.getText();
+            String name = voterNameField.getText();
+            int age;
+
+            try {
+                age = Integer.parseInt(voterAgeField.getText());
+            } catch (NumberFormatException ex) {
+                showMessageDialog("Invalid age. Please enter a valid number.");
+                return;
+            }
+
+            if (voters.containsKey(id)) {
+                showMessageDialog("Voter already registered.");
+                return;
+            }
+
+            if (age < 18) {
+                showMessageDialog("Voter must be at least 18 years old.");
+                return;
+            }
+
+            Voter voter = new Voter(id, name, age, electionTypeChoice.getSelectedItem());
+            voters.put(id, voter);
+            auditLog.add("Voter registered: ID=" + id + ", Name=" + name);
+            showMessageDialog("Voter registered successfully.");
+        });
+
+        voterFrame.addWindowListener(new WindowAdapter() {
+            public void windowClosing(WindowEvent e) {
+                voterFrame.dispose();
+            }
+        });
+
+        voterFrame.setVisible(true);
+    }
+
+    private void createCandidateManagementFrame() {
+        Frame candidateFrame = new Frame("Candidate Management");
+        candidateFrame.setLayout(new GridLayout(4, 2));
+        candidateFrame.setSize(400, 200);
+
+        TextField candidateNameField = new TextField();
+        TextField candidateAgeField = new TextField();
+        Choice electionTypeChoice = new Choice();
+        Button addCandidateButton = new Button("Add Candidate");
+
+        electionTypeChoice.add("Government");
+        electionTypeChoice.add("Education");
+        electionTypeChoice.add("Organization");
+
+        candidateFrame.add(new Label("Candidate Name:"));
+        candidateFrame.add(candidateNameField);
+        candidateFrame.add(new Label("Candidate Age:"));
+        candidateFrame.add(candidateAgeField);
+        candidateFrame.add(new Label("Election Type:"));
+        candidateFrame.add(electionTypeChoice);
+        candidateFrame.add(addCandidateButton);
+
+        addCandidateButton.addActionListener(e -> {
+            String name = candidateNameField.getText().trim();
+            String ageText = candidateAgeField.getText().trim();
+            int age;
+
+            if (name.isEmpty()) {
+                showMessageDialog("Candidate name cannot be empty.");
+                return;
+            }
+
+            try {
+                age = Integer.parseInt(ageText);
+            } catch (NumberFormatException ex) {
+                showMessageDialog("Invalid age. Please enter a valid number.");
+                return;
+            }
+
+            if (age < 18) {
+                showMessageDialog("Candidate must be at least 18 years old.");
+                return;
+            }
+
+            String electionType = electionTypeChoice.getSelectedItem();
+
+            if (candidates.stream().anyMatch(c -> c.getName().equalsIgnoreCase(name))) {
+                showMessageDialog("Candidate already exists.");
+                return;
+            }
+
+            // Eligibility criteria checks
+            if (!isEligibleForElectionType(electionType)) {
+                showMessageDialog("Candidate is not eligible for the selected election type.");
+                return;
+            }
+
+            candidates.add(new Candidate(name, age, electionType));
+            auditLog.add("Candidate added: " + name + " (Age: " + age + ", Election Type: " + electionType + ")");
+            showMessageDialog("Candidate added successfully.");
+        });
+
+        candidateFrame.addWindowListener(new WindowAdapter() {
+            public void windowClosing(WindowEvent e) {
+                candidateFrame.dispose();
+            }
+        });
+
+        candidateFrame.setVisible(true);
+    }
+
+    private boolean isEligibleForElectionType(String electionType) {
+        // Define some eligibility rules based on election type
+        if ("Government".equalsIgnoreCase(electionType)) {
+            return true; // assume all candidates are eligible for government elections
+        } else if ("Education".equalsIgnoreCase(electionType)) {
+            return true; // assume all candidates are eligible for education elections
+        } else if ("Organization".equalsIgnoreCase(electionType)) {
+            return true; // assume all candidates are eligible for organization elections
+        }
+        return false;
+    }
+
+    private void createVotingFrame() {
+        Frame votingFrame = new Frame("Voting");
+        votingFrame.setLayout(new GridLayout(5, 2));
+        votingFrame.setSize(400, 200);
+
+        TextField voterIdField = new TextField();
+        TextField voterNameField = new TextField();
+        TextField voterAgeField = new TextField();
+        Choice candidateChoice = new Choice();
+        Button voteButton = new Button("Vote");
+
+        for (Candidate candidate : candidates) {
+            candidateChoice.add(candidate.getName());
+        }
+
+        votingFrame.add(new Label("Voter ID:"));
+        votingFrame.add(voterIdField);
+        votingFrame.add(new Label("Name:"));
+        votingFrame.add(voterNameField);
+        votingFrame.add(new Label("Age:"));
+        votingFrame.add(voterAgeField);
+        votingFrame.add(new Label("Select Candidate:"));
+        votingFrame.add(candidateChoice);
+        votingFrame.add(voteButton);
+
+        voteButton.addActionListener(e -> {
+            String voterId = voterIdField.getText();
+            String voterName = voterNameField.getText();
+            int voterAge;
+
+            try {
+                voterAge = Integer.parseInt(voterAgeField.getText());
+            } catch (NumberFormatException ex) {
+                showMessageDialog("Invalid age. Please enter a valid number.");
+                return;
+            }
+
+            if (!voters.containsKey(voterId)) {
+                showMessageDialog("Voter not registered.");
+                return;
+            }
+
+            Voter voter = voters.get(voterId);
+
+            if (!voter.getName().equalsIgnoreCase(voterName) || voter.getAge() != voterAge) {
+                showMessageDialog("Voter details do not match.");
+                return;
+            }
+
+            if (voter.hasVoted()) {
+                showMessageDialog("Voter has already cast a vote.");
+                return;
+            }
+
+            String selectedCandidate = candidateChoice.getSelectedItem();
+            for (Candidate candidate : candidates) {
+                if (candidate.getName().equalsIgnoreCase(selectedCandidate)) {
+                    candidate.incrementVotes();
+                    voter.setHasVoted(true);
+                    auditLog.add("Vote cast by Voter ID=" + voterId + " for Candidate=" + selectedCandidate);
+                    showMessageDialog("Vote cast successfully.");
+                    return;
+                }
+            }
+
+            showMessageDialog("Candidate not found.");
+        });
+
+        votingFrame.addWindowListener(new WindowAdapter() {
+            public void windowClosing(WindowEvent e) {
+                votingFrame.dispose();
+            }
+        });
+
+        votingFrame.setVisible(true);
+    }
+
+    private void validateResultsPassword() {
+        Frame passwordFrame = new Frame("Enter Admin Password");
+        passwordFrame.setLayout(new FlowLayout());
+        passwordFrame.setSize(300, 150);
+
+        TextField passwordField = new TextField();
+        Button submitButton = new Button("Submit");
+
+        passwordFrame.add(new Label("Password:"));
+        passwordFrame.add(passwordField);
+        passwordFrame.add(submitButton);
+
+        submitButton.addActionListener(e -> {
+            if (ADMIN_RESULT_PASSWORD.equals(passwordField.getText())) {
+                showResultsFrame();
+            } else {
+                showMessageDialog("Incorrect password.");
+            }
+            passwordFrame.dispose();
+        });
+
+        passwordFrame.setVisible(true);
+    }
+
+    private void validateAuditLogPassword() {
+        Frame passwordFrame = new Frame("Enter Admin Password");
+        passwordFrame.setLayout(new FlowLayout());
+        passwordFrame.setSize(300, 150);
+
+        TextField passwordField = new TextField();
+        Button submitButton = new Button("Submit");
+
+        passwordFrame.add(new Label("Password:"));
+        passwordFrame.add(passwordField);
+        passwordFrame.add(submitButton);
+
+        submitButton.addActionListener(e -> {
+            if (ADMIN_AUDIT_PASSWORD.equals(passwordField.getText())) {
+                showAuditLogFrame();
+            } else {
+                showMessageDialog("Incorrect password.");
+            }
+            passwordFrame.dispose();
+        });
+
+        passwordFrame.setVisible(true);
+    }
+
+    private void showResultsFrame() {
+        Frame resultsFrame = new Frame("Election Results");
+        resultsFrame.setLayout(new BorderLayout());
+        resultsFrame.setSize(400, 300);
+
+        TextArea resultsArea = new TextArea();
+        resultsArea.setEditable(false);
+
+        StringBuilder results = new StringBuilder("Election Results:\n");
+        for (Candidate candidate : candidates) {
+            results.append(String.format("%-20s %d\n", candidate.getName(), candidate.getVotes()));
+        }
+        resultsArea.setText(results.toString());
+        resultsFrame.add(resultsArea, BorderLayout.CENTER);
+
+        resultsFrame.addWindowListener(new WindowAdapter() {
+            public void windowClosing(WindowEvent e) {
+                resultsFrame.dispose();
+            }
+        });
+
+        resultsFrame.setVisible(true);
+    }
+
+    private void showAuditLogFrame() {
+        Frame auditFrame = new Frame("Audit Log");
+        auditFrame.setLayout(new BorderLayout());
+        auditFrame.setSize(400, 300);
+
+        TextArea auditArea = new TextArea();
+        auditArea.setEditable(false);
+
+        StringBuilder log = new StringBuilder("Audit Log:\n");
+        for (String logEntry : auditLog) {
+            log.append(logEntry).append("\n");
+        }
+        auditArea.setText(log.toString());
+        auditFrame.add(auditArea, BorderLayout.CENTER);
+
+        auditFrame.addWindowListener(new WindowAdapter() {
+            public void windowClosing(WindowEvent e) {
+                auditFrame.dispose();
+            }
+        });
+
+        auditFrame.setVisible(true);
+    }
+
+    private void showMessageDialog(String message) {
+        Frame messageFrame = new Frame();
+        messageFrame.setSize(200, 100);
+        messageFrame.setLayout(new FlowLayout());
+        messageFrame.add(new Label(message));
+        Button okButton = new Button("OK");
+        messageFrame.add(okButton);
+        okButton.addActionListener(e -> messageFrame.dispose());
+        messageFrame.setVisible(true);
+    }
+
+    public static void main(String[] args) {
+        new OnlineVotingSystem();
+    }
+
+    // Voter class
+    class Voter {
+        private final String id;
+        private final String name;
+        private final int age;
+        private final String electionType;
+        private boolean hasVoted = false;
+
+        public Voter(String id, String name, int age, String electionType) {
+            this.id = id;
+            this.name = name;
+            this.age = age;
+            this.electionType = electionType;
+        }
+
+        public String getId() {
+            return id;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public int getAge() {
+            return age;
+        }
+
+        public String getElectionType() {
+            return electionType;
+        }
+
+        public boolean hasVoted() {
+            return hasVoted;
+        }
+
+        public void setHasVoted(boolean hasVoted) {
+            this.hasVoted = hasVoted;
+        }
+    }
+
+    // Candidate class
+    class Candidate {
+        private final String name;
+        private final int age;
+        private final String electionType;
+        private int votes = 0;
+
+        public Candidate(String name, int age, String electionType) {
+            this.name = name;
+            this.age = age;
+            this.electionType = electionType;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public int getVotes() {
+            return votes;
+        }
+
+        public void incrementVotes() {
+            votes++;
+        }
+    }
+}
